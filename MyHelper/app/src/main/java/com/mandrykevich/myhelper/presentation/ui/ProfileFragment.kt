@@ -7,17 +7,22 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.ViewModelProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.mandrykevich.myhelper.R
 import com.mandrykevich.myhelper.databinding.FragmentProfileBinding
 import com.mandrykevich.myhelper.domain.usecase.SignOutUseCase
+import com.mandrykevich.myhelper.presentation.viewModel.SearchViewModel
 import com.mandrykevich.myhelper.utils.Constants.MAIN
+import com.mandrykevich.myhelper.utils.SearchQueryAdapter
 
 
 class ProfileFragment : Fragment() {
 
     lateinit var binding : FragmentProfileBinding
     private lateinit var signOutUseCase: SignOutUseCase
+    private lateinit var searchViewModel: SearchViewModel
+    private lateinit var adapter: SearchQueryAdapter
 
 
     override fun onCreateView(
@@ -37,7 +42,12 @@ class ProfileFragment : Fragment() {
             confirmSignOut()
         }
 
+        searchViewModel = ViewModelProvider(requireActivity()).get(SearchViewModel::class.java)
 
+        searchViewModel.searchQueries.observe(viewLifecycleOwner) { queries ->
+            adapter = SearchQueryAdapter(queries)
+            binding.rvResult.adapter = adapter
+        }
     }
 
     private fun confirmSignOut() {

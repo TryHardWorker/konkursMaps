@@ -155,7 +155,7 @@
     </androidx.cardview.widget.CardView>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+        android:id="@+id/rv_result"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="16dp"
@@ -174,7 +174,7 @@
         android:layout_marginTop="32dp"
         android:text="Вы не сделали ещё ни одного запроса"
         android:textColor="@color/Grey4"
-        app:layout_constraintEnd_toEndOf="@+id/recyclerView"
-        app:layout_constraintStart_toStartOf="@+id/recyclerView"
-        app:layout_constraintTop_toTopOf="@+id/recyclerView" />
+        app:layout_constraintEnd_toEndOf="@+id/rv_result"
+        app:layout_constraintStart_toStartOf="@+id/rv_result"
+        app:layout_constraintTop_toTopOf="@+id/rv_result" />
 </androidx.constraintlayout.widget.ConstraintLayout>

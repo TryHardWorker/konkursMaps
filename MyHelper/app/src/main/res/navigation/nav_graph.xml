@@ -25,8 +25,8 @@
             android:id="@+id/action_registrationFragment_to_logInFragment"
             app:destination="@id/logInFragment" />
         <action
-            android:id="@+id/action_registrationFragment_to_mapFragment"
-            app:destination="@id/mapFragment" />
+            android:id="@+id/action_registrationFragment_to_tutorialFragment"
+            app:destination="@id/tutorialFragment" />
     </fragment>
     <fragment
         android:id="@+id/mapFragment"
@@ -63,5 +63,14 @@
         <action
             android:id="@+id/action_searchFragment_to_profileFragment"
             app:destination="@id/profileFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/tutorialFragment"
+        android:name="com.mandrykevich.myhelper.presentation.ui.TutorialFragment"
+        android:label="fragment_tutorial"
+        tools:layout="@layout/fragment_tutorial" >
+        <action
+            android:id="@+id/action_tutorialFragment_to_mapFragment"
+            app:destination="@id/mapFragment" />
     </fragment>
 </navigation>

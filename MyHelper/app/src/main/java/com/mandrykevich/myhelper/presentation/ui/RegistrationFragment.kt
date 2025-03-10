@@ -49,9 +49,8 @@ class RegistrationFragment : Fragment() {
                     result.task.addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         Toast.makeText(context, "Регистрация успешна", Toast.LENGTH_SHORT).show()
-                        MAIN.navController.navigate(R.id.action_registrationFragment_to_mapFragment)
+                        MAIN.navController.navigate(R.id.action_registrationFragment_to_tutorialFragment)
                         fragmentSwitcher.setupBottomNavigation()
-                        MAIN.binding.bNav.visibility = View.VISIBLE
                     } else {
                     Toast.makeText(context, "Ошибка регистрации: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                         }

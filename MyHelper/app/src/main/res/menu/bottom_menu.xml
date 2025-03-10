@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/item_map"
+        android:icon="@drawable/ic_massenger"
+        android:title="Карта"
+        android:orderInCategory="1"/>
+
+
+
+
+    <item
+        android:id="@+id/item_profile"
+        android:icon="@drawable/ic_profile"
+        android:title="Профиль"
+        android:orderInCategory="1"/>
+</menu>

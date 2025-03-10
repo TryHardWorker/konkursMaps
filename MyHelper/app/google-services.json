@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "602280532313",
+    "firebase_url": "https://emobiledb-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "emobiledb",
+    "storage_bucket": "emobiledb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:602280532313:android:110206c701bf1b84859448",
+        "android_client_info": {
+          "package_name": "com.mandrykevich.emobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAybe6StMQafsbpF6CZv7f9_yMoWL_sT1c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:602280532313:android:02a8374ea37cb15d859448",
+        "android_client_info": {
+          "package_name": "com.mandrykevich.myhelper"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAybe6StMQafsbpF6CZv7f9_yMoWL_sT1c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -42,7 +42,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        binding.rvResult.layoutManager = LinearLayoutManager(requireContext()) // Добавьте это
+        binding.rvResult.layoutManager = LinearLayoutManager(requireContext())
         adapter = CommentsAdapter(userItemsList)
         binding.rvResult.adapter = adapter
     }
@@ -55,7 +55,7 @@ class ProfileFragment : Fragment() {
         binding.cardExit.setOnClickListener {
             confirmSignOut()
         }
-        fetchUserItems(auth.currentUser ?.email) // Измените на uid вместо email
+        fetchUserItems(auth.currentUser ?.email)
     }
 
     private fun fetchUserItems(userId: String?) {
@@ -65,15 +65,16 @@ class ProfileFragment : Fragment() {
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 userItemsList.clear()
+                binding.tvEmpty.visibility = View.GONE
                 snapshot.children.mapNotNull { it.getValue(Comment::class.java) }
                     .filter { it.userId == userId }
                     .forEach { comment ->
                         userItemsList.add(comment)
                     }
                 if (userItemsList.isEmpty()) {
-                    Toast.makeText(context, "Нет комментариев для отображения", Toast.LENGTH_SHORT).show()
+
                 } else {
-                    Toast.makeText(context, "Комментарии загружены", Toast.LENGTH_SHORT).show()
+                    binding.tvEmpty.visibility = View.VISIBLE
                 }
                 adapter.notifyDataSetChanged()
             }

@@ -168,11 +168,11 @@
         app:layout_constraintVertical_bias="0.0" />
 
     <TextView
-        android:id="@+id/textView"
+        android:id="@+id/tv_empty"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:text="Вы не сделали ещё ни одного запроса"
+        android:text="Вы не оставили ещё ни одного комментария"
         android:textColor="@color/Grey4"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="@+id/rv_result"

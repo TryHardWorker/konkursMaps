@@ -51,10 +51,9 @@ class MapFragment : Fragment(), OnCommentFetchListener {
     private lateinit var tapListener: MapTapListener
     private lateinit var addCommentUseCase: AddCommentUseCase
     private lateinit var commentsAdapter: CommentsAdapter
-    private lateinit var searchManager: SearchManager
     private lateinit var viewModel: MapViewModel
     private lateinit var viewModelSearch: SearchViewModel
-    private val commentsList = mutableListOf<Comment>()
+    val commentsList = mutableListOf<Comment>()
 
     private lateinit var imageViewStars: List<ImageView>
     private var activeStars = 0
@@ -131,17 +130,13 @@ class MapFragment : Fragment(), OnCommentFetchListener {
 
     private fun observeSearchResults() {
         viewModel.searchResults.onEach { geoObjects ->
-            mapView.map.mapObjects.clear() // Очищаем предыдущие метки
+            mapView.map.mapObjects.clear()
             geoObjects.forEach { geoObject ->
                 geoObject.geometry.firstOrNull()?.point?.let { point ->
-                    addPlacemark(point) // Добавляем метку на карту
-
-                    // Сохраняем запрос
-                    viewModelSearch.addSearchQuery("Ваш запрос") // Замените на фактический текст запроса
-
-                    // Перемещаем камеру к первой найденной метке
+                    addPlacemark(point)
+                    viewModelSearch.addSearchQuery("Ваш запрос")
                     val cameraPosition = CameraPosition(Point(point.latitude, point.longitude), 18f, 0.0f, 0.0f)
-                    mapView.map.move(cameraPosition, Animation(Animation.Type.SMOOTH, 0.5f), null) // Перемещение камеры
+                    mapView.map.move(cameraPosition, Animation(Animation.Type.SMOOTH, 0.5f), null)
                 }
             }
         }.launchIn(viewLifecycleOwner.lifecycleScope)

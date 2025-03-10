@@ -1,36 +1,50 @@
 package com.mandrykevich.myhelper.presentation.ui
 
-import android.content.Context
 import android.os.Bundle
-import androidx.fragment.app.Fragment
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.mandrykevich.myhelper.R
+import com.mandrykevich.myhelper.data.repository.Comment
 import com.mandrykevich.myhelper.databinding.FragmentProfileBinding
 import com.mandrykevich.myhelper.domain.usecase.SignOutUseCase
 import com.mandrykevich.myhelper.presentation.viewModel.SearchViewModel
+import com.mandrykevich.myhelper.utils.CommentsAdapter
 import com.mandrykevich.myhelper.utils.Constants.MAIN
-import com.mandrykevich.myhelper.utils.SearchQueryAdapter
-
 
 class ProfileFragment : Fragment() {
 
-    lateinit var binding : FragmentProfileBinding
+    private lateinit var binding: FragmentProfileBinding
     private lateinit var signOutUseCase: SignOutUseCase
     private lateinit var searchViewModel: SearchViewModel
-    private lateinit var adapter: SearchQueryAdapter
-
+    private lateinit var adapter: CommentsAdapter
+    private val userItemsList = mutableListOf<Comment>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
+        searchViewModel = ViewModelProvider(requireActivity()).get(SearchViewModel::class.java)
         binding = FragmentProfileBinding.inflate(inflater)
+        setupRecyclerView()
         return binding.root
+    }
+
+    private fun setupRecyclerView() {
+        binding.rvResult.layoutManager = LinearLayoutManager(requireContext()) // Добавьте это
+        adapter = CommentsAdapter(userItemsList)
+        binding.rvResult.adapter = adapter
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -41,13 +55,33 @@ class ProfileFragment : Fragment() {
         binding.cardExit.setOnClickListener {
             confirmSignOut()
         }
+        fetchUserItems(auth.currentUser ?.email) // Измените на uid вместо email
+    }
 
-        searchViewModel = ViewModelProvider(requireActivity()).get(SearchViewModel::class.java)
+    private fun fetchUserItems(userId: String?) {
+        if (userId == null) return
 
-        searchViewModel.searchQueries.observe(viewLifecycleOwner) { queries ->
-            adapter = SearchQueryAdapter(queries)
-            binding.rvResult.adapter = adapter
-        }
+        val databaseRef = FirebaseDatabase.getInstance().getReference("Comments")
+        databaseRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                userItemsList.clear()
+                snapshot.children.mapNotNull { it.getValue(Comment::class.java) }
+                    .filter { it.userId == userId }
+                    .forEach { comment ->
+                        userItemsList.add(comment)
+                    }
+                if (userItemsList.isEmpty()) {
+                    Toast.makeText(context, "Нет комментариев для отображения", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Комментарии загружены", Toast.LENGTH_SHORT).show()
+                }
+                adapter.notifyDataSetChanged()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("ProfileFragment", "Ошибка получения данных: ${error.message}")
+            }
+        })
     }
 
     private fun confirmSignOut() {
@@ -66,7 +100,6 @@ class ProfileFragment : Fragment() {
     }
 
     companion object {
-
         @JvmStatic
         fun newInstance() = ProfileFragment()
     }

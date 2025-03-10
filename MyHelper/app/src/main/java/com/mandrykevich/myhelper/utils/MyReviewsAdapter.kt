@@ -9,8 +9,9 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.mandrykevich.myhelper.R
 import com.mandrykevich.myhelper.data.repository.Comment
+import com.mandrykevich.myhelper.data.repository.SearchQuery
 
-class CommentsAdapter(private val comments: List<Comment>) : RecyclerView.Adapter<CommentsAdapter.CommentViewHolder>() {
+class MyReviewsAdapter(private val comments: List<Comment>) : RecyclerView.Adapter<CommentsAdapter.CommentViewHolder>() {
 
     class CommentViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val tvName: TextView = itemView.findViewById(R.id.tv_name)
@@ -21,12 +22,12 @@ class CommentsAdapter(private val comments: List<Comment>) : RecyclerView.Adapte
         val ivHasParking: ImageView = itemView.findViewById(R.id.item_iv_has_parking)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CommentViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CommentsAdapter.CommentViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_review, parent, false)
-        return CommentViewHolder(view)
+        return CommentsAdapter.CommentViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: CommentViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: CommentsAdapter.CommentViewHolder, position: Int) {
         val comment = comments[position]
         holder.tvName.text = comment.userId
         holder.tvStars.text = comment.rating.toString()

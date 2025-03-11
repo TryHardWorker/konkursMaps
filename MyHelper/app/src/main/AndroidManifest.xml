@@ -20,7 +20,7 @@
             android:value="AIzaSyCtsT_FvC-RXsgBq_dEYsybMyBVIiKByVQ"
             />
         <activity
-            android:windowSoftInputMode="adjustResize"
+            android:windowSoftInputMode="adjustPan"
             android:name=".presentation.ui.MainActivity"
             android:exported="true">
             <intent-filter>

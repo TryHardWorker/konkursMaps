@@ -72,9 +72,9 @@ class ProfileFragment : Fragment() {
                         userItemsList.add(comment)
                     }
                 if (userItemsList.isEmpty()) {
-
-                } else {
                     binding.tvEmpty.visibility = View.VISIBLE
+                } else {
+                    binding.tvEmpty.visibility = View.GONE
                 }
                 adapter.notifyDataSetChanged()
             }

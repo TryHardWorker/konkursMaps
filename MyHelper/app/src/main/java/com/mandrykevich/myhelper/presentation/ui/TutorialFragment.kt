@@ -60,9 +60,9 @@ class TutorialFragment : Fragment() {
 
             if (binding.tvTutorial.text == pages[5]) {
                 binding.btnNext.text = "Закрыть"
+                MAIN.binding.bNav.selectedItemId = R.id.item_map
             }
 
-            // Если нажали на "Закрыть"
             if (currentPage >= pages.size) {
                 MAIN.navController.navigate(R.id.action_tutorialFragment_to_mapFragment)
                 MAIN.binding.bNav.visibility =View.VISIBLE

@@ -7,51 +7,61 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.mandrykevich.myhelper.R
 import com.mandrykevich.myhelper.databinding.FragmentLogInBinding
 import com.mandrykevich.myhelper.domain.usecase.LogInUseCase
-import com.mandrykevich.myhelper.managers.FragmentSwitcher
 import com.mandrykevich.myhelper.utils.Constants.MAIN
 
 class LogInFragment : Fragment() {
 
     private lateinit var binding: FragmentLogInBinding
     private lateinit var logInUseCase: LogInUseCase
-    private lateinit var fragmentSwitcher: FragmentSwitcher
+
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        fragmentSwitcher = FragmentSwitcher(requireActivity() as MainActivity)
         binding = FragmentLogInBinding.inflate(inflater)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // Скрываем layout до проверки
+        binding.root.visibility = View.INVISIBLE
+
+        // Проверяем авторизацию
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            // Уже авторизован — не показываем логин, сразу переходим на карту
+            (requireActivity() as? MainActivity)?.checkAuthAndRedirect()
+        } else {
+            // Не авторизован — показываем логин
+            binding.root.visibility = View.VISIBLE
+        }
 
         val auth = FirebaseAuth.getInstance()
-        logInUseCase = LogInUseCase(auth)
+        val database = FirebaseDatabase.getInstance() // Инициализация FirebaseDatabase
+        logInUseCase = LogInUseCase(auth, database) // Передаем database в конструктор
 
         binding.btnLogin.setOnClickListener {
             val email = binding.etLoginEmail.text.trim().toString()
             val password = binding.etLoginPassword.text.trim().toString()
 
-            when (val result = logInUseCase.execute(email, password)) {
-                is LogInUseCase.Result.Error -> {
-                    Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
-                }
-                is LogInUseCase.Result.Success -> {
-                    result.task.addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Toast.makeText(context, "Вход успешен", Toast.LENGTH_SHORT).show()
-                            MAIN.navController.navigate(R.id.action_logInFragment_to_mapFragment)
-                            fragmentSwitcher.setupBottomNavigation()
-                            MAIN.binding.bNav.visibility = View.VISIBLE
-                        } else {
-                            Toast.makeText(context, "Ошибка входа: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+            logInUseCase.execute(email, password) { result ->
+                when (result) {
+                    is LogInUseCase.Result.Error -> {
+                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                    }
+                    is LogInUseCase.Result.Success -> {
+                        Toast.makeText(context, "Вход успешен", Toast.LENGTH_SHORT).show()
+                        // Проверяем, есть ли сообщение о модераторе
+                        result.message?.let { message ->
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
+                        (requireActivity() as? MainActivity)?.checkAuthAndRedirect()
                     }
                 }
             }

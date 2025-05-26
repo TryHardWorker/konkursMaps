@@ -60,7 +60,7 @@ class TutorialFragment : Fragment() {
 
             if (binding.tvTutorial.text == pages[5]) {
                 binding.btnNext.text = "Закрыть"
-                MAIN.binding.bNav.selectedItemId = R.id.item_map
+                MAIN.binding.bNav.selectedItemId = R.id.mapFragment
             }
 
             if (currentPage >= pages.size) {

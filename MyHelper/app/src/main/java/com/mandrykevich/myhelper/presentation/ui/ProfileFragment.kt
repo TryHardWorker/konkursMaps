@@ -1,14 +1,15 @@
 package com.mandrykevich.myhelper.presentation.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -49,13 +50,20 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        binding.btnToSettings.setOnClickListener {
+            findNavController().navigate(R.id.action_profileFragment_to_settingsFragment)
+        }
+
         val auth = FirebaseAuth.getInstance()
         signOutUseCase = SignOutUseCase(auth)
 
         binding.cardExit.setOnClickListener {
             confirmSignOut()
         }
-        fetchUserItems(auth.currentUser ?.email)
+
+        // Получаем пользовательские комментарии
+        fetchUserItems(auth.currentUser?.email)
     }
 
     private fun fetchUserItems(userId: String?) {
@@ -71,11 +79,7 @@ class ProfileFragment : Fragment() {
                     .forEach { comment ->
                         userItemsList.add(comment)
                     }
-                if (userItemsList.isEmpty()) {
-                    binding.tvEmpty.visibility = View.VISIBLE
-                } else {
-                    binding.tvEmpty.visibility = View.GONE
-                }
+                binding.tvEmpty.visibility = if (userItemsList.isEmpty()) View.VISIBLE else View.GONE
                 adapter.notifyDataSetChanged()
             }
 
@@ -91,8 +95,8 @@ class ProfileFragment : Fragment() {
             .setMessage("Вы уверены, что хотите выйти?")
             .setPositiveButton("Да") { dialog, which ->
                 signOutUseCase.execute()
-                MAIN.binding.bNav.visibility = View.GONE
-                MAIN.navController.navigate(R.id.logInFragment)
+
+                findNavController().navigate(R.id.logInFragment)
             }
             .setNegativeButton("Нет") { dialog, which ->
                 dialog.dismiss()

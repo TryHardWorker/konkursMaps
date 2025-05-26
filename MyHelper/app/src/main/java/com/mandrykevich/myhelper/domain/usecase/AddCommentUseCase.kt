@@ -52,7 +52,7 @@ class AddCommentUseCase(
             hasHelper = hasHelper
         )
 
-        database.getReference("Comments").child(commentId).setValue(comment)
+        database.getReference("MustChecked").child(commentId).setValue(comment)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     callback(Result.Success(task))

@@ -11,20 +11,19 @@ import com.google.firebase.database.FirebaseDatabase
 import com.mandrykevich.myhelper.R
 import com.mandrykevich.myhelper.databinding.FragmentRegistrationBinding
 import com.mandrykevich.myhelper.domain.usecase.RegisterUserUseCase
-import com.mandrykevich.myhelper.managers.FragmentSwitcher
 import com.mandrykevich.myhelper.utils.Constants.MAIN
 
 class RegistrationFragment : Fragment() {
 
     private lateinit var binding: FragmentRegistrationBinding
     private lateinit var registerUserUseCase: RegisterUserUseCase
-    private lateinit var fragmentSwitcher: FragmentSwitcher
+
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        fragmentSwitcher = FragmentSwitcher(requireActivity() as MainActivity)
+
         binding = FragmentRegistrationBinding.inflate(inflater)
         return binding.root
     }
@@ -50,7 +49,7 @@ class RegistrationFragment : Fragment() {
                     if (task.isSuccessful) {
                         Toast.makeText(context, "Регистрация успешна", Toast.LENGTH_SHORT).show()
                         MAIN.navController.navigate(R.id.action_registrationFragment_to_tutorialFragment)
-                        fragmentSwitcher.setupBottomNavigation()
+
                     } else {
                     Toast.makeText(context, "Ошибка регистрации: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                         }

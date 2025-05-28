@@ -7,5 +7,7 @@ data class Comment(
     val comment: String = "",
     val hasDisabledParking: Boolean = false,
     val hasElevator: Boolean = false,
-    val hasHelper: Boolean = false
+    val hasHelper: Boolean = false,
+    @com.google.firebase.database.Exclude
+    var id: String? = null
 )

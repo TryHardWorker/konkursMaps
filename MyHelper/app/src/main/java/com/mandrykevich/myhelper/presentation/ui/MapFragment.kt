@@ -329,6 +329,7 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
                     val comment = commentSnapshot.getValue(Comment::class.java)
                     if (comment != null) {
                         if (comment.buildingId == buildingId) {
+                            comment.id = commentSnapshot.key
                             fetchedAndFilteredComments.add(comment)
                             Log.d("MapFragment", "Fetched and filtered comment with ID: ${commentSnapshot.key} for buildingId: ${comment.buildingId}")
                         } else {
@@ -535,10 +536,8 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
     }
 
     override fun onObjectTapped(point: Point?, objectName: String?, objectId: String?) {
-        // Скрываем список последних запросов при нажатии на здание
         binding.cvRespond.visibility = View.GONE
-        // Логика, связанная с тапом по объекту, без маршрутизации
-        // В этом методе мы не обновляем selectedBuildingPoint и не управляем видимостью кнопки im_direction
+
     }
 
     companion object {

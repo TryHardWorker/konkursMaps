@@ -17,6 +17,11 @@ import com.mandrykevich.myhelper.data.repository.Comment
 import com.mandrykevich.myhelper.databinding.FragmentModerationBinding
 import com.mandrykevich.myhelper.utils.ModerationAdapterComms
 
+enum class ModerationState {
+    MUST_CHECKED,
+    REPORTED
+}
+
 class ModerationFragment : Fragment() {
 
     lateinit var binding: FragmentModerationBinding
@@ -24,6 +29,7 @@ class ModerationFragment : Fragment() {
     private lateinit var adapter: ModerationAdapterComms
     private var currentComment: Comment? = null
     private var currentCommentId: String? = null
+    private var currentState: ModerationState = ModerationState.MUST_CHECKED
     private var isShowingReported = false
 
 
@@ -45,26 +51,11 @@ class ModerationFragment : Fragment() {
 
         loadFirstComment()
 
-        binding.btnAccept.setOnClickListener {
-            currentComment?.let { comment ->
-                currentCommentId?.let { id ->
-                    publishComment(id, comment)
-                }
-            }
-        }
-        binding.btnDenied.setOnClickListener {
-            if (isShowingReported) {
-                currentCommentId?.let { id ->
-                    currentComment?.let { comment ->
-                        deleteReported(id, comment)
-                    }
-                }
-            } else {
-                currentCommentId?.let { id -> deleteComment(id) }
-            }
-        }
+        setupButtons()
+
         binding.btnSwap.setOnClickListener {
             isShowingReported = !isShowingReported
+            currentState = if (isShowingReported) ModerationState.REPORTED else ModerationState.MUST_CHECKED
             if (isShowingReported) {
                 loadFirstReported()
                 binding.btnSwap.text = "Показать комментарии на публикацию"
@@ -123,45 +114,98 @@ class ModerationFragment : Fragment() {
         })
     }
 
-    private fun changeReputation(nickname: String, delta: Int) {
-        val usersRef = FirebaseDatabase.getInstance().getReference("Users")
-        usersRef.orderByChild("nickname").equalTo(nickname)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    for (userSnap in snapshot.children) {
-                        val reputation = userSnap.child("reputation").getValue(Int::class.java) ?: 0
-                        val newReputation = (reputation + delta).coerceIn(-5, 5)
-                        userSnap.ref.child("reputation").setValue(newReputation)
-                    }
+    private fun setupButtons() {
+        binding.btnAccept.setOnClickListener {
+            if (currentState == ModerationState.MUST_CHECKED) {
+                // Логика для MustChecked: публикация
+                currentComment?.let { comment ->
+                    // Добавляем балл репутации (максимум 5)
+                    updateUserReputation(comment.userId, 1)
+                    // Перемещаем в Comments
+                    moveCommentToComments(comment)
                 }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+            } else {
+                // Логика для Reported: оставить комментарий
+                currentComment?.let { comment ->
+                    // Просто удаляем из Reported
+                    deleteCommentFromReported(comment)
+                }
+            }
+        }
+
+        binding.btnDenied.setOnClickListener {
+            if (currentState == ModerationState.MUST_CHECKED) {
+                // Логика для MustChecked: запрет публикации
+                currentComment?.let { comment ->
+                    // Отнимаем балл репутации (минимум -5)
+                    updateUserReputation(comment.userId, -1)
+                    // Удаляем из MustChecked
+                    deleteCommentFromMustChecked(comment)
+                }
+            } else {
+                // Логика для Reported: удалить комментарий
+                currentComment?.let { comment ->
+                    // Отнимаем балл репутации
+                    updateUserReputation(comment.userId, -1)
+                    // Удаляем из Reported и Comments
+                    deleteCommentFromReported(comment)
+                    deleteCommentFromComments(comment)
+                }
+            }
+        }
     }
 
-    private fun publishComment(id: String, comment: Comment) {
+    private fun updateUserReputation(userId: String, change: Int) {
+        val userRef = FirebaseDatabase.getInstance().getReference("Users").child(userId)
+        userRef.get().addOnSuccessListener { snapshot ->
+            val currentReputation = snapshot.child("reputation").getValue(Int::class.java) ?: 0
+            val newReputation = (currentReputation + change).coerceIn(-5, 5)
+            userRef.child("reputation").setValue(newReputation)
+        }
+    }
+
+    private fun moveCommentToComments(comment: Comment) {
         val commentsRef = FirebaseDatabase.getInstance().getReference("Comments")
-        commentsRef.child(id).setValue(comment).addOnSuccessListener {
-            changeReputation(comment.userId, 1)
-            deleteComment(id)
+        val mustCheckedRef = FirebaseDatabase.getInstance().getReference("MustChecked")
+        
+        // Добавляем в Comments
+        commentsRef.push().setValue(comment)
+            .addOnSuccessListener {
+                // После успешного добавления удаляем из MustChecked
+                currentCommentId?.let { id ->
+                    mustCheckedRef.child(id).removeValue()
+                        .addOnSuccessListener {
+                            if (currentState == ModerationState.MUST_CHECKED) loadFirstComment() else loadFirstReported()
+                        }
+                }
+            }
+    }
+
+    private fun deleteCommentFromMustChecked(comment: Comment) {
+        FirebaseDatabase.getInstance().getReference("MustChecked")
+            .child(currentCommentId!!)
+            .removeValue()
+            .addOnSuccessListener {
+                if (currentState == ModerationState.MUST_CHECKED) loadFirstComment() else loadFirstReported()
+            }
+    }
+
+    private fun deleteCommentFromReported(comment: Comment) {
+        currentCommentId?.let { id ->
+            FirebaseDatabase.getInstance().getReference("Reported")
+                .child(id)
+                .removeValue()
+                .addOnSuccessListener {
+                    if (currentState == ModerationState.MUST_CHECKED) loadFirstComment() else loadFirstReported()
+                }
         }
     }
 
-    private fun deleteComment(id: String) {
-        currentComment?.let { comment ->
-            changeReputation(comment.userId, -1)
-        }
-        val ref = FirebaseDatabase.getInstance().getReference("MustChecked")
-        ref.child(id).removeValue().addOnSuccessListener {
-            loadFirstComment()
-        }
-    }
-
-    private fun deleteReported(id: String, comment: Comment) {
-        val reportedRef = FirebaseDatabase.getInstance().getReference("Reported")
-        reportedRef.child(id).removeValue().addOnSuccessListener {
-            val commentsRef = FirebaseDatabase.getInstance().getReference("Comments")
-            commentsRef.child(id).removeValue()
-            loadFirstReported()
+    private fun deleteCommentFromComments(comment: Comment) {
+        comment.id?.let { originalId ->
+            FirebaseDatabase.getInstance().getReference("Comments")
+                .child(originalId)
+                .removeValue()
         }
     }
 

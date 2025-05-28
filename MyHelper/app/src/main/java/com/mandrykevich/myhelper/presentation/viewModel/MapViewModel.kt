@@ -41,4 +41,11 @@ class MapViewModel : ViewModel() {
             }
         )
     }
+
+    fun processSearchResults(response: Response) {
+        viewModelScope.launch {
+            val geoObjects = response.collection.children.mapNotNull { it.obj }
+            _searchResults.value = geoObjects
+        }
+    }
 }

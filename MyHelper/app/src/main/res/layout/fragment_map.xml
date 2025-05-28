@@ -5,7 +5,7 @@
     android:id="@+id/frame_layout_1"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/dark"
+    android:background="@color/Shadows"
     tools:context=".presentation.ui.MapFragment">
 
 
@@ -312,15 +312,13 @@
 
                     <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/btn_add_com"
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_marginBottom="8dp"
+                        android:layout_width="0dp"
+                        android:layout_height="30dp"
+                        android:layout_marginTop="16dp"
                         android:background="@drawable/buttonstyle_1"
                         android:text="+"
                         android:textColor="@color/Grey5"
-                        android:textSize="34sp"
+                        android:textSize="20sp"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintHorizontal_bias="1.0"
@@ -330,7 +328,7 @@
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rv_reviews"
                         android:layout_width="0dp"
-                        android:layout_height="180dp"
+                        android:layout_height="280dp"
                         android:layout_marginStart="16dp"
                         android:layout_marginEnd="16dp"
                         android:visibility="gone"
@@ -338,17 +336,50 @@
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@+id/object_name" />
 
-                    <ImageButton
-                        android:id="@+id/imageButton"
+                    <androidx.cardview.widget.CardView
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginTop="16dp"
-                        android:src="@drawable/baseline_assistant_navigation_24"
+                        android:layout_marginEnd="16dp"
+                        android:background="@color/lightGray"
+                        android:backgroundTint="#4791FF"
+                        app:cardCornerRadius="12dp"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@+id/object_name"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="parent">
+
+                        <ImageButton
+                            android:id="@+id/im_direction"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:backgroundTint="#4791FF"
+                            android:src="@drawable/baseline_assistant_navigation_24" />
+                    </androidx.cardview.widget.CardView>
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cv_respond"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:layout_marginTop="32dp"
+                android:layout_marginEnd="24dp"
+                android:background="@color/Grey2"
+                android:backgroundTint="@color/Grey2"
+                android:visibility="gone"
+                app:cardCornerRadius="45dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_last_respond"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="24dp"
+                    android:layout_marginTop="76dp"
+                    android:layout_marginRight="24sp" />
             </androidx.cardview.widget.CardView>
         </androidx.constraintlayout.widget.ConstraintLayout>
 

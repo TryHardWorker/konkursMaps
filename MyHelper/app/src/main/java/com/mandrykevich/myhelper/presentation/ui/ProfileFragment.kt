@@ -44,7 +44,7 @@ class ProfileFragment : Fragment() {
 
     private fun setupRecyclerView() {
         binding.rvResult.layoutManager = LinearLayoutManager(requireContext())
-        adapter = CommentsAdapter(userItemsList)
+        adapter = CommentsAdapter(userItemsList, showReportButton = false, )
         binding.rvResult.adapter = adapter
     }
 

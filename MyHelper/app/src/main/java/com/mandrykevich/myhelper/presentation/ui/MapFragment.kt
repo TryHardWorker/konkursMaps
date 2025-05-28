@@ -21,7 +21,6 @@ import com.google.firebase.database.ValueEventListener
 import com.mandrykevich.myhelper.R
 import com.mandrykevich.myhelper.data.repository.Comment
 import com.mandrykevich.myhelper.databinding.FragmentMapBinding
-import com.mandrykevich.myhelper.domain.usecase.AddCommentUseCase
 import com.mandrykevich.myhelper.managers.MapStateManager
 import com.mandrykevich.myhelper.managers.MapTapListener
 import com.mandrykevich.myhelper.presentation.viewModel.MapViewModel
@@ -43,8 +42,29 @@ import com.yandex.runtime.Error
 import com.yandex.runtime.image.ImageProvider
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import com.yandex.mapkit.user_location.UserLocationLayer
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import com.yandex.mapkit.user_location.UserLocationObjectListener
+import com.yandex.mapkit.user_location.UserLocationView
+import com.yandex.runtime.ui_view.ViewProvider
+import android.widget.TextView
+import com.yandex.mapkit.GeoObject
+import com.yandex.mapkit.layers.ObjectEvent
+import com.mandrykevich.myhelper.managers.OnObjectTapListener
+import com.yandex.mapkit.map.IconStyle
+import android.graphics.PointF
+import com.mandrykevich.myhelper.domain.usecase.AddCommentUseCase
+import android.content.Context
+import android.content.SharedPreferences
+import com.mandrykevich.myhelper.utils.RecentQueriesAdapter
+import android.text.TextWatcher
+import android.text.Editable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
-class MapFragment : Fragment(), OnCommentFetchListener {
+class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
     private lateinit var binding: FragmentMapBinding
     private lateinit var mapView: MapView
     private lateinit var mapStateManager: MapStateManager
@@ -61,33 +81,49 @@ class MapFragment : Fragment(), OnCommentFetchListener {
     private var hasElevator = false
     private var hasParking = false
 
+    private var userLocationLayer: UserLocationLayer? = null
+
+    // Переменные для последних запросов
+    private lateinit var recentQueriesAdapter: RecentQueriesAdapter
+    private lateinit var sharedPreferences: SharedPreferences
+    private val PREFS_NAME = "RecentQueriesPrefs"
+    private val QUERIES_KEY = "queries"
+    private val MAX_QUERIES = 5 // Максимальное количество сохраняемых запросов
+    private val MAX_VISIBLE_QUERIES = 3 // Максимальное количество отображаемых запросов
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         binding = FragmentMapBinding.inflate(inflater)
-        viewModel = ViewModelProvider(this).get(MapViewModel::class.java)
-        viewModelSearch = ViewModelProvider(this).get(SearchViewModel::class.java)
+        viewModel = ViewModelProvider(this)[MapViewModel::class.java]
+        viewModelSearch = ViewModelProvider(this)[SearchViewModel::class.java]
+        sharedPreferences = requireActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         setupRecyclerView()
         initializeMap()
         initializeFirebase()
         setupStarClickListeners()
+        setupRecentQueries()
         return binding.root
     }
 
     private fun setupRecyclerView() {
         binding.rvReviews.layoutManager = LinearLayoutManager(requireContext())
-        commentsAdapter = CommentsAdapter(commentsList)
+        commentsAdapter = CommentsAdapter(commentsList, showReportButton = true)
         binding.rvReviews.adapter = commentsAdapter
     }
 
     private fun initializeMap() {
         mapView = binding.mainMap
         mapStateManager = MapStateManager(requireActivity())
-        tapListener = MapTapListener("", requireContext(), binding, this)
+        tapListener = MapTapListener("", requireContext(), binding, this, this)
         binding.mainMap.map.addTapListener(tapListener)
         val initialPosition = mapStateManager.restoreMapState(mapView)
-        mapView.map.move(initialPosition)
+        mapView.map.move(
+            initialPosition,
+            Animation(Animation.Type.SMOOTH, 0.5f),
+            null
+        )
     }
 
     private fun initializeFirebase() {
@@ -115,13 +151,85 @@ class MapFragment : Fragment(), OnCommentFetchListener {
         observeSearchResults()
         setupCommentButton()
         setupToggleButtons()
+        requestLocationPermission()
+    }
+
+    private fun setupRecentQueries() {
+        recentQueriesAdapter = RecentQueriesAdapter(emptyList()) { query ->
+            binding.editTextText.setText(query)
+            binding.editTextText.setSelection(query.length)
+            binding.cvRespond.visibility = View.GONE
+        }
+        binding.rvLastRespond.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvLastRespond.adapter = recentQueriesAdapter
+
+        binding.cvRespond.visibility = View.GONE
+
+        binding.editTextText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    val currentText = s.toString()
+                    val allQueries = getRecentQueries()
+
+                    if (currentText.isEmpty()) {
+                        // Если текст пустой, показываем последние MAX_VISIBLE_QUERIES запросов
+                        val recent = if (allQueries.size > MAX_VISIBLE_QUERIES) allQueries.take(MAX_VISIBLE_QUERIES) else allQueries
+                        recentQueriesAdapter.updateQueries(recent)
+                        binding.cvRespond.visibility = if (recent.isNotEmpty()) View.VISIBLE else View.GONE
+                    } else {
+                        // Фильтруем запросы по введенному тексту и ограничиваем количество
+                        val filteredQueries = allQueries.filter { it.contains(currentText, ignoreCase = true) }
+                            .take(MAX_VISIBLE_QUERIES)
+                        recentQueriesAdapter.updateQueries(filteredQueries)
+                        binding.cvRespond.visibility = if (filteredQueries.isNotEmpty()) View.VISIBLE else View.GONE
+                    }
+                }
+            }
+
+            override fun afterTextChanged(e: Editable?) {}
+        })
+    }
+
+    private fun loadAndShowRecentQueries() {
+        val queries = getRecentQueries()
+        if (queries.isNotEmpty()) {
+            recentQueriesAdapter.updateQueries(queries)
+            binding.cvRespond.visibility = View.VISIBLE
+        } else {
+            binding.cvRespond.visibility = View.GONE
+        }
+    }
+
+    private fun saveRecentQuery(query: String) {
+        val queries = getRecentQueries().toMutableList()
+        queries.remove(query)
+        queries.add(0, query)
+        while (queries.size > MAX_QUERIES) {
+            queries.removeAt(queries.size - 1)
+        }
+        val editor = sharedPreferences.edit()
+        editor.putString(QUERIES_KEY, queries.joinToString(",,"))
+        editor.apply()
+    }
+
+    private fun getRecentQueries(): List<String> {
+        val queriesString = sharedPreferences.getString(QUERIES_KEY, null)
+        return if (queriesString.isNullOrEmpty()) {
+            emptyList()
+        } else {
+            queriesString.split(",,").toList()
+        }
     }
 
     private fun setupSearchButton() {
         binding.imSearch.setOnClickListener {
             val query = binding.editTextText.text.toString()
             if (query.isNotEmpty()) {
+                saveRecentQuery(query)
                 performSearch(query)
+                binding.cvRespond.visibility = View.GONE
             } else {
                 Toast.makeText(requireContext(), "Введите текст для поиска", Toast.LENGTH_SHORT).show()
             }
@@ -134,7 +242,9 @@ class MapFragment : Fragment(), OnCommentFetchListener {
             geoObjects.forEach { geoObject ->
                 geoObject.geometry.firstOrNull()?.point?.let { point ->
                     addPlacemark(point)
-                    viewModelSearch.addSearchQuery("Ваш запрос")
+                    if (::viewModelSearch.isInitialized) {
+                        viewModelSearch.addSearchQuery("Ваш запрос")
+                    }
                     val cameraPosition = CameraPosition(Point(point.latitude, point.longitude), 18f, 0.0f, 0.0f)
                     mapView.map.move(cameraPosition, Animation(Animation.Type.SMOOTH, 0.5f), null)
                 }
@@ -174,140 +284,261 @@ class MapFragment : Fragment(), OnCommentFetchListener {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        binding.mainMap.map.removeTapListener(tapListener)
+        if (::tapListener.isInitialized) {
+            binding.mainMap.map.removeTapListener(tapListener)
+        }
     }
 
     override fun onStart() {
         super.onStart()
         mapView.onStart()
         MapKitFactory.getInstance().onStart()
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
+            userLocationLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.mapWindow)
+            userLocationLayer?.setVisible(true)
+            userLocationLayer?.setObjectListener(userLocationObjectListener)
+        } else {
+            requestLocationPermission()
+        }
     }
 
     override fun onStop() {
         super.onStop()
         mapView.onStop()
         MapKitFactory.getInstance().onStop()
+        if (userLocationLayer != null) {
+            userLocationLayer?.setVisible(false)
+        }
         mapStateManager.saveMapState(mapView)
     }
 
     override fun fetchComments(buildingId: String) {
+        Log.d("MapFragment", "Fetching comments for buildingId: $buildingId (filtering locally)")
+
         val commentsRef = FirebaseDatabase.getInstance().getReference("Comments")
-        commentsRef.addValueEventListener(object : ValueEventListener {
+
+        commentsRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 commentsList.clear()
-                snapshot.children.mapNotNull { it.getValue(Comment::class.java) }
-                    .filter { it.buildingId == buildingId }
-                    .forEach { comment ->
-                        commentsList.add(comment)
-                        Log.d("MapFragment", "Comment added: ${comment.comment}")
+                Log.d("MapFragment", "Received data snapshot with ${snapshot.childrenCount} total children from 'Comments' node.")
+
+                val fetchedAndFilteredComments = mutableListOf<Comment>()
+
+                for (commentSnapshot in snapshot.children) {
+                    val comment = commentSnapshot.getValue(Comment::class.java)
+                    if (comment != null) {
+                        if (comment.buildingId == buildingId) {
+                            fetchedAndFilteredComments.add(comment)
+                            Log.d("MapFragment", "Fetched and filtered comment with ID: ${commentSnapshot.key} for buildingId: ${comment.buildingId}")
+                        } else {
+                            // Опционально: логировать комментарии, которые не соответствуют buildingId
+                            // Log.d("MapFragment", "Skipping comment with ID: ${commentSnapshot.key} for buildingId: ${comment.buildingId}")
+                        }
+                    } else {
+                        Log.w("MapFragment", "Failed to parse comment at key: ${commentSnapshot.key}")
                     }
-                commentsAdapter.notifyDataSetChanged()
-                binding.rvReviews.visibility = if (commentsList.isEmpty()) View.GONE else View.VISIBLE
+                }
+
+                commentsList.addAll(fetchedAndFilteredComments)
+
+                if (::commentsAdapter.isInitialized) {
+                    commentsAdapter.updateComments(commentsList)
+                    Log.d("MapFragment", "CommentsAdapter updated with ${commentsList.size} filtered comments.")
+                } else {
+                    Log.e("MapFragment", "CommentsAdapter is not initialized!")
+                }
+
+                if (commentsList.isNotEmpty()) {
+                    binding.rvReviews.visibility = View.VISIBLE
+                    Log.d("MapFragment", "Showing RecyclerView, filtered comments found.")
+                } else {
+                    binding.rvReviews.visibility = View.GONE
+                    Log.d("MapFragment", "Hiding RecyclerView, no filtered comments found.")
+                }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e("MapFragment", "Ошибка получения комментариев: ${error.message}")
+                Log.e("MapFragment", "Error fetching comments: ${error.message}")
             }
         })
     }
 
-    private fun setActiveStars(count: Int) {
-        activeStars = count
-        imageViewStars.forEachIndexed { index, imageView ->
-            imageView.setColorFilter(
-                if (index < count) ContextCompat.getColor(requireContext(), R.color.yellow)
-                else ContextCompat.getColor(requireContext(), R.color.black),
-                PorterDuff.Mode.SRC_IN
-            )
+    private val userLocationObjectListener = object : UserLocationObjectListener {
+        override fun onObjectAdded(userLocationView: UserLocationView) {
+            userLocationView.arrow.setIcon(
+                ImageProvider.fromResource(
+                    requireContext(), R.drawable.user_arrow))
+
+            val pinIcon = userLocationView.pin.useCompositeIcon()
+
+            pinIcon.setIcon(
+                "icon",
+                ImageProvider.fromResource(requireContext(), R.drawable.search_result_placemark),
+                IconStyle().setAnchor(
+                    android.graphics.PointF(
+                        0.5f, 0.5f)))
+
+            val accuracyCircleColor = try {
+                ContextCompat.getColor(requireContext(), R.color.green)
+            } catch (e: Exception) {
+                ContextCompat.getColor(requireContext(), android.R.color.holo_blue_light)
+            }
+            userLocationView.accuracyCircle.fillColor = accuracyCircleColor
+        }
+
+        override fun onObjectRemoved(userLocationView: UserLocationView) {
+            // Nothing to do
+        }
+
+        override fun onObjectUpdated(userLocationView: UserLocationView, objectEvent: ObjectEvent) {
+            // Nothing to do
+        }
+    }
+
+    private val REQUEST_LOCATION_PERMISSION = 1
+
+    private fun requestLocationPermission() {
+        ActivityCompat.requestPermissions(
+            requireActivity(),
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+            REQUEST_LOCATION_PERMISSION
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                userLocationLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.mapWindow)
+                userLocationLayer?.setVisible(true)
+                userLocationLayer?.setObjectListener(userLocationObjectListener)
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Для отображения вашего местоположения необходимо разрешение",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun toggleButtonState(button: ImageView) {
+        val tagKey = button.id
+
+        val currentState = button.getTag(tagKey) as? Boolean ?: false
+        val newState = !currentState
+        button.setTag(tagKey, newState)
+
+        val colorResId = if (newState) {
+             try {
+                 when (button.id) {
+                    R.id.iv_has_helper -> R.color.Blue
+                    R.id.iv_has_elevator -> R.color.Green
+                    R.id.iv_has_parking -> R.color.orange
+                    else -> android.R.color.holo_blue_light
+                 }
+            } catch (e: Exception) {
+                android.R.color.holo_blue_light
+            }
+        } else {
+             try {
+                 R.color.Grey1
+             } catch (e: Exception) {
+                 android.R.color.darker_gray
+             }
+        }
+
+        val color = ContextCompat.getColor(requireContext(), colorResId)
+        button.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+
+        when (button.id) {
+            R.id.iv_has_helper -> hasHelper = newState
+            R.id.iv_has_elevator -> hasElevator = newState
+            R.id.iv_has_parking -> hasParking = newState
+        }
+    }
+
+    private fun clearForm() {
+        updateActiveStars(0)
+        hasHelper = false
+        hasElevator = false
+        hasParking = false
+        binding.editComText.text.clear()
+        if (::imageViewStars.isInitialized) {
+             toggleButtonState(binding.ivHasHelper)
+             toggleButtonState(binding.ivHasElevator)
+             toggleButtonState(binding.ivHasParking)
         }
     }
 
     private fun updateActiveStars(count: Int) {
-        setActiveStars(count)
-    }
-
-    private fun toggleButtonState(imageView: ImageView) {
-        val isActive = when (imageView) {
-            binding.ivHasHelper -> hasHelper
-            binding.ivHasElevator -> hasElevator
-            binding.ivHasParking -> hasParking
-            else -> false
-        }
-
-        val newColor = if (!isActive) {
-            when (imageView) {
-                binding.ivHasHelper -> {
-                    hasHelper = true
-                    ContextCompat.getColor(requireContext(), R.color.yellow)
+        activeStars = count
+        if (::imageViewStars.isInitialized) {
+            imageViewStars.forEachIndexed { index, imageView ->
+                val colorResId = if (index < count) {
+                     try {
+                         R.color.yellow
+                     } catch (e: Exception) {
+                         android.R.color.holo_orange_light
+                     }
+                } else {
+                     try {
+                         R.color.Grey1
+                     } catch (e: Exception) {
+                         android.R.color.darker_gray
+                     }
                 }
-                binding.ivHasElevator -> {
-                    hasElevator = true
-                    ContextCompat.getColor(requireContext(), R.color.yellow)
-                }
-                binding.ivHasParking -> {
-                    hasParking = true
-                    ContextCompat.getColor(requireContext(), R.color.yellow)
-                }
-                else -> ContextCompat.getColor(requireContext(), R.color.black)
-            }
-        } else {
-            when (imageView) {
-                binding.ivHasHelper -> {
-                    hasHelper = false
-                    ContextCompat.getColor(requireContext(), R.color.black)
-                }
-                binding.ivHasElevator -> {
-                    hasElevator = false
-                    ContextCompat.getColor(requireContext(), R.color.black)
-                }
-                binding.ivHasParking -> {
-                    hasParking = false
-                    ContextCompat.getColor(requireContext(), R.color.black)
-                }
-                else -> ContextCompat.getColor(requireContext(), R.color.black)
+                val color = ContextCompat.getColor(requireContext(), colorResId)
+                imageView.setColorFilter(color, PorterDuff.Mode.SRC_IN)
             }
         }
-
-        imageView.setColorFilter(newColor, PorterDuff.Mode.SRC_IN)
-    }
-
-    private fun clearForm() {
-        setActiveStars(0)
-        binding.editComText.text.clear()
-        hasHelper = false
-        hasElevator = false
-        hasParking = false
-
-        binding.ivHasHelper.setColorFilter(ContextCompat.getColor(requireContext(), R.color.black), PorterDuff.Mode.SRC_IN)
-        binding.ivHasElevator.setColorFilter(ContextCompat.getColor(requireContext(), R.color.black), PorterDuff.Mode.SRC_IN)
-        binding.ivHasParking.setColorFilter(ContextCompat.getColor(requireContext(), R.color.black), PorterDuff.Mode.SRC_IN)
     }
 
     private fun addPlacemark(point: Point) {
-        val placemark = mapView.map.mapObjects.addPlacemark(point)
-        val icon = ImageProvider.fromResource(requireContext(), R.drawable.ic_result)
-        placemark.setIcon(icon)
-        placemark.setGeometry(point)
+        val placemark = mapView.map.mapObjects.addPlacemark(
+            point,
+            ImageProvider.fromResource(requireContext(), R.drawable.search_result_placemark)
+        )
+        if (::tapListener.isInitialized) {
+             placemark.addTapListener(tapListener)
+        }
     }
 
     private fun performSearch(query: String) {
-        val visibleRegion = VisibleRegionUtils.toPolygon(mapView.map.visibleRegion)
-        viewModel.performSearch(query, visibleRegion)
-    }
+        val searchManager = SearchFactory.getInstance().createSearchManager(SearchManagerType.COMBINED)
+        val options = com.yandex.mapkit.search.SearchOptions()
+        val visibleRegion = mapView.map.visibleRegion
+        val screenCenter = VisibleRegionUtils.toPolygon(visibleRegion)
 
-    private val searchSessionListener = object : Session.SearchListener {
-        override fun onSearchResponse(response: Response) {
-            val geoObjects = response.collection.children.mapNotNull { it.obj }
-            geoObjects.forEach { geoObject ->
-                geoObject.geometry.firstOrNull()?.point?.let { point ->
-                    addPlacemark(point)
+        searchManager.submit(
+            query,
+            screenCenter,
+            options,
+            object : Session.SearchListener {
+                override fun onSearchResponse(response: Response) {
+                    if (::viewModel.isInitialized) {
+                        viewModel.processSearchResults(response)
+                    }
+                }
+
+                override fun onSearchError(error: Error) {
+                    Log.e("Search", "Search error: ${error.javaClass.name}")
+                    Toast.makeText(requireContext(), "Ошибка поиска: ${error.javaClass.name}", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
+        )
+    }
 
-        override fun onSearchError(error: Error) {
-            Toast.makeText(requireContext(), "Ошибка поиска", Toast.LENGTH_SHORT).show()
-        }
+    override fun onObjectTapped(point: Point?, objectName: String?, objectId: String?) {
+        // Скрываем список последних запросов при нажатии на здание
+        binding.cvRespond.visibility = View.GONE
+        // Логика, связанная с тапом по объекту, без маршрутизации
+        // В этом методе мы не обновляем selectedBuildingPoint и не управляем видимостью кнопки im_direction
     }
 
     companion object {

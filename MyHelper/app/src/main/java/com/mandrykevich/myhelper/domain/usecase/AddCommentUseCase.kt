@@ -3,6 +3,9 @@ package com.mandrykevich.myhelper.domain.usecase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.android.gms.tasks.Task
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import com.mandrykevich.myhelper.data.repository.Comment
 
 class AddCommentUseCase(
@@ -32,34 +35,41 @@ class AddCommentUseCase(
             return
         }
 
-        val userId = auth.currentUser ?.email ?: run {
+        val userUid = auth.currentUser?.uid ?: run {
             callback(Result.Error("Пользователь не аутентифицирован"))
             return
         }
 
-        val commentId = database.getReference("Comments").push().key ?: run {
-            callback(Result.Error("Ошибка при создании ID комментария"))
-            return
-        }
-
-        val comment = Comment(
-            buildingId = buildingId,
-            userId = userId,
-            rating = rating,
-            comment = commentText,
-            hasDisabledParking = hasDisabledParking,
-            hasElevator = hasElevator,
-            hasHelper = hasHelper
-        )
-
-        database.getReference("MustChecked").child(commentId).setValue(comment)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    callback(Result.Success(task))
-                } else {
-                    callback(Result.Error("Ошибка при добавлении комментария: ${task.exception?.message}"))
+        val userRef = database.getReference("Users").child(userUid)
+        userRef.child("nickname").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val nickname = snapshot.getValue(String::class.java) ?: "Аноним"
+                val commentId = database.getReference("Comments").push().key ?: run {
+                    callback(Result.Error("Ошибка при создании ID комментария"))
+                    return
                 }
+                val comment = Comment(
+                    buildingId = buildingId,
+                    userId = nickname,
+                    rating = rating,
+                    comment = commentText,
+                    hasDisabledParking = hasDisabledParking,
+                    hasElevator = hasElevator,
+                    hasHelper = hasHelper
+                )
+                database.getReference("MustChecked").child(commentId).setValue(comment)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            callback(Result.Success(task))
+                        } else {
+                            callback(Result.Error("Ошибка при добавлении комментария: ${task.exception?.message}"))
+                        }
+                    }
             }
+            override fun onCancelled(error: DatabaseError) {
+                callback(Result.Error("Ошибка получения никнейма"))
+            }
+        })
     }
 
     sealed class Result {

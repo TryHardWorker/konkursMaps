@@ -171,7 +171,7 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
         routesCollection = mapView.map.mapObjects.addCollection()
         
         binding.imDirection.setOnClickListener {
-            buildRouteToMinsk()
+            buildRouteToSelectedPoint()
         }
     }
 
@@ -562,24 +562,26 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
         selectedPoint = point
     }
 
-    private fun buildRouteToMinsk() {
-        val startPoint = selectedPoint
-        if (startPoint == null) {
+    private fun buildRouteToSelectedPoint() {
+        val endPoint = selectedPoint
+        if (endPoint == null) {
             Toast.makeText(requireContext(), "Сначала выберите точку на карте", Toast.LENGTH_SHORT).show()
             return
         }
-
-        val minskPoint = Point(53.900601, 27.558972) // Центр Минска
-
+        val userLocation = userLocationLayer?.cameraPosition()?.target
+        if (userLocation == null) {
+            Toast.makeText(requireContext(), "Не удалось определить ваше местоположение", Toast.LENGTH_SHORT).show()
+            return
+        }
         val drivingRouter = DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
-        val drivingOptions = DrivingOptions()
+        val drivingOptions = DrivingOptions().apply {
+            routesCount = 1 // Только один маршрут
+        }
         val vehicleOptions = VehicleOptions()
-
         val requestPoints = listOf(
-            RequestPoint(startPoint, RequestPointType.WAYPOINT, null, null),
-            RequestPoint(minskPoint, RequestPointType.WAYPOINT, null, null)
+            RequestPoint(userLocation, RequestPointType.WAYPOINT, null, null),
+            RequestPoint(endPoint, RequestPointType.WAYPOINT, null, null)
         )
-
         drivingSession = drivingRouter.requestRoutes(
             requestPoints,
             drivingOptions,
@@ -588,17 +590,14 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
                 override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
                     routesCollection.clear()
                     if (drivingRoutes.isEmpty()) return
-
-                    drivingRoutes.forEachIndexed { index, route ->
-                        routesCollection.addPolyline(route.geometry).apply {
-                            zIndex = if (index == 0) 10f else 5f
-                            setStrokeColor(ContextCompat.getColor(requireContext(),
-                                if (index == 0) R.color.green else R.color.green))
-                            setStrokeWidth(if (index == 0) 8f else 5f)
-                        }
+                    // Отображаем только самый короткий маршрут (первый)
+                    val route = drivingRoutes.first()
+                    routesCollection.addPolyline(route.geometry).apply {
+                        zIndex = 10f
+                        setStrokeColor(ContextCompat.getColor(requireContext(), R.color.green))
+                        setStrokeWidth(8f)
                     }
                 }
-
                 override fun onDrivingRoutesError(error: com.yandex.runtime.Error) {
                     when (error) {
                         is NetworkError -> Toast.makeText(requireContext(), "Ошибка сети при построении маршрута", Toast.LENGTH_SHORT).show()

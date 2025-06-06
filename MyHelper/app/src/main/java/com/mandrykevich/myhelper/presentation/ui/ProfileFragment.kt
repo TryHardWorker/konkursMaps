@@ -56,7 +56,7 @@ class ProfileFragment : Fragment() {
         }
 
         val auth = FirebaseAuth.getInstance()
-        signOutUseCase = SignOutUseCase(auth)
+        signOutUseCase = SignOutUseCase(auth, requireContext())
 
         binding.cardExit.setOnClickListener {
             confirmSignOut()

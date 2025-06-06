@@ -61,8 +61,19 @@ import android.content.SharedPreferences
 import com.mandrykevich.myhelper.utils.RecentQueriesAdapter
 import android.text.TextWatcher
 import android.text.Editable
+import com.yandex.mapkit.RequestPoint
+import com.yandex.mapkit.RequestPointType
+import com.yandex.mapkit.directions.DirectionsFactory
+import com.yandex.mapkit.directions.driving.DrivingOptions
+import com.yandex.mapkit.directions.driving.DrivingRoute
+import com.yandex.mapkit.directions.driving.DrivingSession
+import com.yandex.mapkit.directions.driving.VehicleOptions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+
+import com.yandex.mapkit.map.MapObjectCollection
+import com.yandex.runtime.network.NetworkError
+import com.yandex.mapkit.directions.driving.DrivingRouterType
 
 class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
     private lateinit var binding: FragmentMapBinding
@@ -90,6 +101,11 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
     private val QUERIES_KEY = "queries"
     private val MAX_QUERIES = 5 // Максимальное количество сохраняемых запросов
     private val MAX_VISIBLE_QUERIES = 3 // Максимальное количество отображаемых запросов
+
+    private var selectedPoint: Point? = null
+
+    private var drivingSession: DrivingSession? = null
+    private lateinit var routesCollection: MapObjectCollection
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -152,6 +168,11 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
         setupCommentButton()
         setupToggleButtons()
         requestLocationPermission()
+        routesCollection = mapView.map.mapObjects.addCollection()
+        
+        binding.imDirection.setOnClickListener {
+            buildRouteToMinsk()
+        }
     }
 
     private fun setupRecentQueries() {
@@ -283,6 +304,7 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
     }
 
     override fun onDestroyView() {
+        drivingSession?.cancel()
         super.onDestroyView()
         if (::tapListener.isInitialized) {
             binding.mainMap.map.removeTapListener(tapListener)
@@ -537,7 +559,54 @@ class MapFragment : Fragment(), OnCommentFetchListener, OnObjectTapListener {
 
     override fun onObjectTapped(point: Point?, objectName: String?, objectId: String?) {
         binding.cvRespond.visibility = View.GONE
+        selectedPoint = point
+    }
 
+    private fun buildRouteToMinsk() {
+        val startPoint = selectedPoint
+        if (startPoint == null) {
+            Toast.makeText(requireContext(), "Сначала выберите точку на карте", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val minskPoint = Point(53.900601, 27.558972) // Центр Минска
+
+        val drivingRouter = DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
+        val drivingOptions = DrivingOptions()
+        val vehicleOptions = VehicleOptions()
+
+        val requestPoints = listOf(
+            RequestPoint(startPoint, RequestPointType.WAYPOINT, null, null),
+            RequestPoint(minskPoint, RequestPointType.WAYPOINT, null, null)
+        )
+
+        drivingSession = drivingRouter.requestRoutes(
+            requestPoints,
+            drivingOptions,
+            vehicleOptions,
+            object : DrivingSession.DrivingRouteListener {
+                override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
+                    routesCollection.clear()
+                    if (drivingRoutes.isEmpty()) return
+
+                    drivingRoutes.forEachIndexed { index, route ->
+                        routesCollection.addPolyline(route.geometry).apply {
+                            zIndex = if (index == 0) 10f else 5f
+                            setStrokeColor(ContextCompat.getColor(requireContext(),
+                                if (index == 0) R.color.green else R.color.green))
+                            setStrokeWidth(if (index == 0) 8f else 5f)
+                        }
+                    }
+                }
+
+                override fun onDrivingRoutesError(error: com.yandex.runtime.Error) {
+                    when (error) {
+                        is NetworkError -> Toast.makeText(requireContext(), "Ошибка сети при построении маршрута", Toast.LENGTH_SHORT).show()
+                        else -> Toast.makeText(requireContext(), "Ошибка построения маршрута", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
     }
 
     companion object {
